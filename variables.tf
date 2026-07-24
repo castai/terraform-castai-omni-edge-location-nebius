@@ -44,12 +44,6 @@ variable "editors_group_id" {
   default     = null
 }
 
-variable "vpc_cidr" {
-  description = "CIDR block for the Nebius VPC network private IPv4 pool"
-  type        = string
-  default     = "10.0.0.0/16"
-}
-
 variable "subnet_cidr" {
   description = "CIDR block for the Nebius subnet private IPv4 pool"
   type        = string
