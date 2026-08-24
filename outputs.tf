@@ -15,6 +15,8 @@ output "nebius_resources" {
     service_account_id        = nebius_iam_v1_service_account.castai.id
     target_service_account_id = nebius_iam_v1_service_account.castai.id
     federated_credentials_id  = nebius_iam_v1_federated_credentials.castai_wif.id
+    editors_group_id          = local.editors_group_id
+    editors_access_permit_id  = try(nebius_iam_v1_access_permit.castai_editor[0].id, null)
     network_id                = nebius_vpc_v1_network.main.id
     subnet_id                 = nebius_vpc_v1_subnet.main.id
     security_group_id         = nebius_vpc_v1_security_group.main.id

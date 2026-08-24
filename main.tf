@@ -25,6 +25,10 @@ locals {
   # Nebius resource names have a 63-char limit; trim to be safe.
   short_resource_name = substr(local.resource_name, 0, 63)
 
+  # Resolve the editors group ID: use the user-provided group when set, or the
+  # module-created dedicated group when editors_group_id is null.
+  editors_group_id = coalesce(var.editors_group_id, try(nebius_iam_v1_group.castai_editors[0].id, null))
+
   # Common labels merged once and reused across all resources.
   # Nebius calls these `labels`; the module exposes them as `tags` for
   # consistency with the AWS / GCP / OCI sibling modules.
@@ -105,13 +109,35 @@ resource "nebius_iam_v1_federated_credentials" "castai_wif" {
   labels = local.common_labels
 }
 
-# Add the service account to the project's `editors` group so it can manage
-# compute instances, disks and networking. Optional: if editors_group_id is
-# not provided, permissions must be granted out-of-band.
-resource "nebius_iam_v1_group_membership" "castai" {
-  count = var.editors_group_id != null ? 1 : 0
+# =============================================================================
+# IAM: Editor group and group membership
+# =============================================================================
 
-  parent_id = var.editors_group_id
+# When editors_group_id is not provided, create a dedicated IAM group for this
+# edge location. The group is granted the editor role on the project below.
+resource "nebius_iam_v1_group" "castai_editors" {
+  count = var.editors_group_id != null ? 0 : 1
+
+  parent_id = var.parent_id
+  name      = "${local.short_resource_name}-editors"
+  labels    = local.common_labels
+}
+
+# Grant the editor role on the project to the dedicated group. The editor role
+# allows managing compute instances, disks, and networking resources.
+resource "nebius_iam_v1_access_permit" "castai_editor" {
+  count = var.editors_group_id != null ? 0 : 1
+
+  parent_id   = nebius_iam_v1_group.castai_editors[0].id
+  resource_id = var.parent_id
+  role        = "editor"
+}
+
+# Add the service account to the editors group so it can manage compute
+# instances, disks and networking. Uses the user-provided group when set, or
+# the module-created dedicated group when editors_group_id is null.
+resource "nebius_iam_v1_group_membership" "castai" {
+  parent_id = local.editors_group_id
   member_id = nebius_iam_v1_service_account.castai.id
 }
 
@@ -218,6 +244,7 @@ resource "castai_edge_location" "this" {
 
   depends_on = [
     nebius_iam_v1_federated_credentials.castai_wif,
+    nebius_iam_v1_access_permit.castai_editor,
     nebius_iam_v1_group_membership.castai,
     nebius_vpc_v1_security_rule.ingress_self,
     nebius_vpc_v1_security_rule.egress_all,
