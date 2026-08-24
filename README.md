@@ -4,11 +4,17 @@ Terraform module for creating CAST AI edge locations on Nebius AI Cloud.
 
 > **Status: draft**
 >
-> This module assumes the CAST AI terraform provider exposes a `nebius` block on
-> `castai_edge_location` and `castai_edge_configuration`, analogous to the
-> existing `aws` / `gcp` / `oci` blocks. That support is not yet available in
-> the published `castai/castai` provider; the module is a draft that will be
-> refined once Nebius support lands in the provider.
+> This module uses the `nebius` block on `castai_edge_location` and
+> `castai_edge_configuration`, which is not yet available in the published
+> `castai/castai` provider. The module is a draft that will be refined once
+> Nebius support lands in the provider.
+>
+> Authentication uses Nebius Workload Identity Federation (WIF): the module
+> creates a Nebius service account and a `nebius_iam_v1_federated_credentials`
+> resource that binds CAST AI's GCP OIDC identity to the service account. The
+> `castai_edge_location` nebius block passes `target_service_account_id`
+> (the module-created service account), enabling CAST AI to impersonate it via
+> OIDC token exchange instead of static authorized-key credentials.
 
 ## Usage
 
@@ -21,7 +27,7 @@ The Nebius terraform provider authenticates as a Nebius service account using
 an authorized key. Configure the provider out-of-band (e.g. via environment
 variables or a profile), and ensure the calling identity has `editor` or
 `admin` rights in the target project so it can create service accounts,
-authorized keys, VPC networks, subnets, and security groups.
+federated credentials, VPC networks, subnets, and security groups.
 
 ```hcl
 provider "nebius" {
@@ -57,7 +63,6 @@ module "castai_nebius_edge_location" {
 | <a name="requirement_nebius"></a> [nebius](#requirement\_nebius) | >= 0.6.8 |
 | <a name="requirement_null"></a> [null](#requirement\_null) | >= 3.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | >= 3.0 |
-| <a name="requirement_tls"></a> [tls](#requirement\_tls) | >= 4.0 |
 
 ## Modules
 
@@ -70,7 +75,7 @@ No modules.
 | [castai_edge_configuration.this](https://registry.terraform.io/providers/castai/castai/latest/docs/resources/edge_configuration) | resource |
 | [castai_edge_configuration_default.this](https://registry.terraform.io/providers/castai/castai/latest/docs/resources/edge_configuration_default) | resource |
 | [castai_edge_location.this](https://registry.terraform.io/providers/castai/castai/latest/docs/resources/edge_location) | resource |
-| [nebius_iam_v1_auth_public_key.castai](https://registry.terraform.io/providers/nebius/nebius/latest/docs/resources/iam_v1_auth_public_key) | resource |
+| [nebius_iam_v1_federated_credentials.castai_wif](https://registry.terraform.io/providers/nebius/nebius/latest/docs/resources/iam_v1_federated_credentials) | resource |
 | [nebius_iam_v1_group_membership.castai](https://registry.terraform.io/providers/nebius/nebius/latest/docs/resources/iam_v1_group_membership) | resource |
 | [nebius_iam_v1_service_account.castai](https://registry.terraform.io/providers/nebius/nebius/latest/docs/resources/iam_v1_service_account) | resource |
 | [nebius_vpc_v1_network.main](https://registry.terraform.io/providers/nebius/nebius/latest/docs/resources/vpc_v1_network) | resource |
@@ -80,7 +85,6 @@ No modules.
 | [nebius_vpc_v1_subnet.main](https://registry.terraform.io/providers/nebius/nebius/latest/docs/resources/vpc_v1_subnet) | resource |
 | [null_resource.validate](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [random_id.suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/id) | resource |
-| [tls_private_key.castai_authorized_key](https://registry.terraform.io/providers/hashicorp/tls/latest/docs/resources/private_key) | resource |
 | [castai_omni_cluster.this](https://registry.terraform.io/providers/castai/castai/latest/docs/data-sources/omni_cluster) | data source |
 | [nebius_iam_v2_project.this](https://registry.terraform.io/providers/nebius/nebius/latest/docs/data-sources/iam_v2_project) | data source |
 
@@ -101,7 +105,6 @@ No modules.
 | <a name="input_parent_id"></a> [parent\_id](#input\_parent\_id) | Nebius project ID that will own the edge location resources (VPC network,<br/>subnet, security group, service account). Must match the parent project<br/>configured in the Nebius provider.<br/><br/>Nebius projects are created per region, so the project's region is read<br/>automatically from the project and used for the edge location. A separate<br/>`region` input is therefore not required. | `string` | n/a | yes |
 | <a name="input_subnet_cidr"></a> [subnet\_cidr](#input\_subnet\_cidr) | CIDR block for the Nebius subnet private IPv4 pool | `string` | `"10.0.0.0/24"` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Labels to apply to Nebius resources (Nebius calls these `labels`) | `map(string)` | `{}` | no |
-| <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR block for the Nebius VPC network private IPv4 pool | `string` | `"10.0.0.0/16"` | no |
 
 ## Outputs
 
@@ -110,6 +113,7 @@ No modules.
 | <a name="output_edge_configuration_ids"></a> [edge\_configuration\_ids](#output\_edge\_configuration\_ids) | Map of edge configuration IDs by configuration key |
 | <a name="output_edge_location_id"></a> [edge\_location\_id](#output\_edge\_location\_id) | CAST AI edge location ID |
 | <a name="output_edge_location_name"></a> [edge\_location\_name](#output\_edge\_location\_name) | CAST AI edge location name |
+| <a name="output_nebius_federated_credentials_id"></a> [nebius\_federated\_credentials\_id](#output\_nebius\_federated\_credentials\_id) | ID of the Nebius WIF federated credentials binding CAST AI's GCP OIDC identity to the service account |
 | <a name="output_nebius_resources"></a> [nebius\_resources](#output\_nebius\_resources) | Nebius resources created for the edge location |
 <!-- END_TF_DOCS -->
 

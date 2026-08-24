@@ -33,7 +33,7 @@ module "castai_gke_cluster" {
   gke_credentials      = module.castai_gke_iam.private_key
 
   default_node_configuration_name = "default"
-  node_configurations             = {
+  node_configurations = {
     default = {
       subnets = [data.google_container_cluster.gke.subnetwork]
     }

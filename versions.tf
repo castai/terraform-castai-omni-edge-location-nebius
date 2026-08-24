@@ -13,10 +13,6 @@ terraform {
       source  = "nebius/nebius"
       version = ">= 0.6.8"
     }
-    tls = {
-      source  = "hashicorp/tls"
-      version = ">= 4.0"
-    }
     random = {
       source  = "hashicorp/random"
       version = ">= 3.0"

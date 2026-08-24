@@ -63,7 +63,7 @@ resource "null_resource" "validate" {
 }
 
 # =============================================================================
-# IAM: Service account, authorized key, and group membership
+# IAM: Service account, WIF federated credentials, and group membership
 # =============================================================================
 
 # Service account that CAST AI will impersonate to manage Nebius resources.
@@ -74,24 +74,35 @@ resource "nebius_iam_v1_service_account" "castai" {
   labels      = local.common_labels
 }
 
-# RSA key pair used as the authorized key for the service account.
-resource "tls_private_key" "castai_authorized_key" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
+# Workload Identity Federation (WIF): bind CAST AI's GCP OIDC identity to the
+# Nebius service account so CAST AI can impersonate it via OIDC token exchange
+# instead of static authorized-key credentials. The OIDC issuer is
+# https://accounts.google.com (CAST AI runs on GCP) and the federated subject
+# is the CAST AI GCP service account unique ID, read from the Omni cluster
+# data source.
+#
+# jwk_set_json is set explicitly because the Nebius federated credentials
+# feature is in PUBLIC PREVIEW: custom external OIDC providers with OIDC
+# discovery are only available for early adopters, but providing the JWKS
+# directly works without limitations. The JWKS is fetched from Google's
+# public cert endpoint at plan time.
+data "http" "google_jwks" {
+  url = "https://www.googleapis.com/oauth2/v3/certs"
 }
 
-# Upload the public key to the service account as an authorized key.
-resource "nebius_iam_v1_auth_public_key" "castai" {
-  parent_id = var.parent_id
-  name      = "${local.short_resource_name}-auth-key"
+resource "nebius_iam_v1_federated_credentials" "castai_wif" {
+  parent_id  = var.parent_id
+  name       = "${local.short_resource_name}-wif"
+  subject_id = nebius_iam_v1_service_account.castai.id
 
-  account = {
-    service_account = {
-      id = nebius_iam_v1_service_account.castai.id
-    }
+  oidc_provider = {
+    issuer_url   = "https://accounts.google.com"
+    jwk_set_json = data.http.google_jwks.response_body
   }
 
-  data = trimspace(tls_private_key.castai_authorized_key.public_key_pem)
+  federated_subject_id = data.castai_omni_cluster.this.castai_oidc_config.gcp_service_account_unique_id
+
+  labels = local.common_labels
 }
 
 # Add the service account to the project's `editors` group so it can manage
@@ -191,20 +202,22 @@ resource "castai_edge_location" "this" {
   zones = [local.zone]
 
   # Nebius cloud provider configuration.
-  # NOTE: the `nebius` block on castai_edge_location is assumed for this draft
-  # and mirrors the structure of the existing `aws` / `gcp` / `oci` blocks.
+  # The nebius block conforms to the castai/castai provider schema at commit
+  # 78331cf (WIF). target_service_account_id enables WIF (OIDC token exchange)
+  # instead of static authorized-key credentials. Both service_account_id and
+  # target_service_account_id point to the same module-created service account.
   nebius = {
-    parent_id             = var.parent_id
-    service_account_id    = nebius_iam_v1_service_account.castai.id
-    authorized_key_id_wo  = nebius_iam_v1_auth_public_key.castai.id
-    private_key_base64_wo = base64encode(tls_private_key.castai_authorized_key.private_key_pem)
-    network_id            = nebius_vpc_v1_network.main.id
-    subnet_id             = nebius_vpc_v1_subnet.main.id
-    subnet_cidr           = var.subnet_cidr
-    security_group_id     = nebius_vpc_v1_security_group.main.id
+    parent_id                 = var.parent_id
+    service_account_id        = nebius_iam_v1_service_account.castai.id
+    target_service_account_id = nebius_iam_v1_service_account.castai.id
+    network_id                = nebius_vpc_v1_network.main.id
+    subnet_id                 = nebius_vpc_v1_subnet.main.id
+    subnet_cidr               = var.subnet_cidr
+    security_group_id         = nebius_vpc_v1_security_group.main.id
   }
 
   depends_on = [
+    nebius_iam_v1_federated_credentials.castai_wif,
     nebius_iam_v1_group_membership.castai,
     nebius_vpc_v1_security_rule.ingress_self,
     nebius_vpc_v1_security_rule.egress_all,
