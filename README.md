@@ -59,7 +59,8 @@ module "castai_nebius_edge_location" {
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
-| <a name="requirement_castai"></a> [castai](#requirement\_castai) | >= 8.46.0 |
+| <a name="requirement_castai"></a> [castai](#requirement\_castai) | >= 8.64.0 |
+| <a name="requirement_http"></a> [http](#requirement\_http) | >= 3.0 |
 | <a name="requirement_nebius"></a> [nebius](#requirement\_nebius) | >= 0.6.8 |
 | <a name="requirement_null"></a> [null](#requirement\_null) | >= 3.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | >= 3.0 |

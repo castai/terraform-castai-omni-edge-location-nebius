@@ -7,7 +7,7 @@ terraform {
       # NOTE: Nebius support in the castai provider is assumed for this draft.
       # Bump to the version that introduces the `nebius` block on
       # castai_edge_location / castai_edge_configuration once available.
-      version = ">= 8.46.0"
+      version = ">= 8.64.0"
     }
     nebius = {
       source  = "nebius/nebius"
