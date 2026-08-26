@@ -37,8 +37,9 @@ variable "editors_group_id" {
   description = <<-EOT
     ID of the Nebius IAM group (e.g. the default `editors` group in the project)
     that the CAST AI service account will be added to so it can manage compute
-    and network resources. If not provided, the service account is created but
-    not added to any group; you must grant permissions out-of-band.
+    and network resources. If not provided, a dedicated IAM group is created
+    automatically and granted the `editor` role on the project, so no
+    out-of-band permission setup is required.
   EOT
   type        = string
   default     = null

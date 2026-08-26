@@ -4,7 +4,7 @@ terraform {
   required_providers {
     castai = {
       source  = "castai/castai"
-      version = ">= 8.39.1"
+      version = ">= 8.64.0"
     }
     google = {
       source  = "hashicorp/google"
@@ -40,14 +40,14 @@ provider "nebius" {
 provider "kubernetes" {
   host                   = "https://${data.google_container_cluster.gke.endpoint}"
   token                  = data.google_client_config.default.access_token
-  cluster_ca_certificate = base64decode(data.google_container_cluster.gke.master_auth.0.cluster_ca_certificate)
+  cluster_ca_certificate = base64decode(data.google_container_cluster.gke.master_auth[0].cluster_ca_certificate)
 }
 
 provider "helm" {
   kubernetes = {
     host                   = "https://${data.google_container_cluster.gke.endpoint}"
     token                  = data.google_client_config.default.access_token
-    cluster_ca_certificate = base64decode(data.google_container_cluster.gke.master_auth.0.cluster_ca_certificate)
+    cluster_ca_certificate = base64decode(data.google_container_cluster.gke.master_auth[0].cluster_ca_certificate)
   }
 }
 
