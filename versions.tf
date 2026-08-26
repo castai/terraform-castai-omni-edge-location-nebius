@@ -10,7 +10,7 @@ terraform {
       version = ">= 8.64.0"
     }
     nebius = {
-      source  = "nebius/nebius"
+      source  = "registry.terraform.io/nebius/nebius"
       version = ">= 0.6.8"
     }
     random = {
