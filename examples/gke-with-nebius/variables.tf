@@ -31,6 +31,11 @@ variable "nebius_service_account_id" {
   description = "Nebius service account ID used to authenticate the Nebius provider."
 }
 
+variable "nebius_editors_group_id" {
+  type        = string
+  description = "Nebius editors group ID that holds permissions for SA"
+}
+
 variable "nebius_public_key_id" {
   type        = string
   sensitive   = true

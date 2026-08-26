@@ -93,9 +93,10 @@ module "castai_omni_cluster" {
 module "castai_nebius_edge_location" {
   source = "../.."
 
-  parent_id       = var.nebius_project_id
-  cluster_id      = module.castai_gke_cluster.cluster_id
-  organization_id = module.castai_gke_cluster.organization_id
+  parent_id        = var.nebius_project_id
+  cluster_id       = module.castai_gke_cluster.cluster_id
+  organization_id  = module.castai_gke_cluster.organization_id
+  editors_group_id = var.nebius_editors_group_id
 
   tags = {
     ManagedBy = "terraform"
