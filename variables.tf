@@ -2,6 +2,16 @@ variable "name" {
   type        = string
   description = "Name for the edge location. If not provided, will be auto-generated"
   default     = null
+
+  validation {
+    # Nebius resource names are limited to 63 chars. The name is prefixed with
+    # "castai-omni-" (12 chars) and the longest suffix is "-ingress-self"
+    # (13 chars), so the sanitized name must be at most 38 chars. replace()
+    # maps each character 1:1, so the sanitized length equals the raw length.
+    condition = var.name == null || length(lower(replace(var.name, "/[^a-zA-Z0-9-]/", "-"))) <= 63 - 12 - 13
+
+    error_message = "name must be at most 38 characters after sanitization so that prefixed and suffixed resource names fit within Nebius' 63-character limit."
+  }
 }
 
 variable "cluster_id" {
@@ -45,10 +55,25 @@ variable "editors_group_id" {
   default     = null
 }
 
+variable "network_cidr" {
+  description = "CIDR block for the Nebius network address pool. Defines the network's private IPv4 address space."
+  type        = string
+  default     = "10.0.0.0/13"
+}
+
 variable "subnet_cidr" {
-  description = "CIDR block for the Nebius subnet private IPv4 pool"
+  description = "CIDR block for the Nebius subnet. Must be within the network CIDR (var.network_cidr)."
   type        = string
   default     = "10.0.0.0/24"
+
+  validation {
+    # Check both mask specificity and address containment: the subnet mask
+    # must be >= the network mask (smaller block), and masking the subnet's
+    # network address with the network's prefix must yield the network's own
+    # address.
+    condition     = tonumber(split("/", var.subnet_cidr)[1]) >= tonumber(split("/", var.network_cidr)[1]) && cidrhost(format("%s/%s", cidrhost(var.subnet_cidr, 0), split("/", var.network_cidr)[1]), 0) == cidrhost(var.network_cidr, 0)
+    error_message = "subnet_cidr must be within the network_cidr address range."
+  }
 }
 
 variable "tags" {

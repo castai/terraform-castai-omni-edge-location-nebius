@@ -16,14 +16,20 @@ locals {
   # Generate name if not provided (with random suffix)
   generated_name = var.name != null ? var.name : "nebius-${data.nebius_iam_v2_project.this.region}-${random_id.suffix.hex}"
 
-  # Sanitize name for Nebius resource naming (lowercase, alnum + hyphen)
+  # Sanitize name for Nebius resource naming (lowercase, alnum + hyphen).
+  # replace() maps each character 1:1, so the sanitized length equals the input.
   sanitized_name = lower(replace(local.generated_name, "/[^a-zA-Z0-9-]/", "-"))
 
-  # Full resource name with prefix
-  resource_name = "castai-omni-${local.sanitized_name}"
-
-  # Nebius resource names have a 63-char limit; trim to be safe.
-  short_resource_name = substr(local.resource_name, 0, 63)
+  # Nebius resource names are limited to 63 characters. short_resource_name is
+  # prefixed with "castai-omni-" (12 chars) and reused with suffixes, the
+  # longest being "-ingress-self" (13 chars). The sanitized core must therefore
+  # be at most 63 - 12 - 13 = 38 chars. This is validated on var.name (see
+  # variables.tf) and guarded by a precondition on the service account below
+  # for the auto-generated (region-derived) path. No silent truncation - the
+  # random suffix is always preserved in full.
+  name_prefix               = "castai-omni-"
+  sanitized_name_max_length = 63 - length(local.name_prefix) - length("-ingress-self")
+  short_resource_name       = "${local.name_prefix}${local.sanitized_name}"
 
   # Resolve the editors group ID: use the user-provided group when set, or the
   # module-created dedicated group when editors_group_id is null.
@@ -76,6 +82,16 @@ resource "nebius_iam_v1_service_account" "castai" {
   name        = local.short_resource_name
   description = "Service account impersonated by CAST AI for edge location ${local.generated_name}"
   labels      = local.common_labels
+
+  lifecycle {
+    precondition {
+      # Backstop for the auto-generated name (var.name == null): the region is
+      # read from the Nebius project and could exceed the budget. User-provided
+      # names are validated on var.name directly (see variables.tf).
+      condition     = length(local.sanitized_name) <= local.sanitized_name_max_length
+      error_message = "Generated resource name exceeds Nebius' 63-character limit; the auto-generated name is too long. Set var.name to a shorter value."
+    }
+  }
 }
 
 # Workload Identity Federation (WIF): bind CAST AI's GCP OIDC identity to the
@@ -145,14 +161,41 @@ resource "nebius_iam_v1_group_membership" "castai" {
 # VPC Network and Subnet
 # =============================================================================
 
-# VPC network that will host edge instances.
+# Address pool carrying the user-provided network CIDR. The network references
+# this pool so its address space is defined by var.network_cidr rather than a
+# random default. The subnet uses a specific CIDR (var.subnet_cidr) carved from
+# this pool.
+resource "nebius_vpc_v1_pool" "main" {
+  parent_id  = var.parent_id
+  name       = local.short_resource_name
+  labels     = local.common_labels
+  version    = "IPV4"
+  visibility = "PRIVATE"
+
+  cidrs = [
+    {
+      cidr = var.network_cidr
+    }
+  ]
+}
+
+# VPC network that will host edge instances. References the address pool so the
+# network's address space is defined by var.network_cidr (not a random default).
 resource "nebius_vpc_v1_network" "main" {
   parent_id = var.parent_id
   name      = local.short_resource_name
   labels    = local.common_labels
+
+  ipv4_private_pools = {
+    pools = [
+      { id = nebius_vpc_v1_pool.main.id }
+    ]
+  }
 }
 
-# Regional private subnet for edge instances.
+# Regional private subnet for edge instances. Uses an explicit CIDR
+# (var.subnet_cidr) that must be within the network's address space
+# (var.network_cidr). max_mask_length constrains allocations from this subnet.
 resource "nebius_vpc_v1_subnet" "main" {
   parent_id  = var.parent_id
   network_id = nebius_vpc_v1_network.main.id
@@ -164,7 +207,9 @@ resource "nebius_vpc_v1_subnet" "main" {
     pools = [
       {
         cidrs = [
-          { cidr = var.subnet_cidr }
+          {
+            cidr = var.subnet_cidr
+          }
         ]
       }
     ]
