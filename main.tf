@@ -28,7 +28,7 @@ locals {
   # for the auto-generated (region-derived) path. No silent truncation - the
   # random suffix is always preserved in full.
   name_prefix               = "castai-omni-"
-  sanitized_name_max_length = 63 - length(local.name_prefix) - length("-ingress-self")
+sanitized_name_max_length = 63 - length(local.name_prefix) - length("-ingress-self")
   short_resource_name       = "${local.name_prefix}${local.sanitized_name}"
 
   # Resolve the editors group ID: use the user-provided group when set, or the
