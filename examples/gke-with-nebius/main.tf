@@ -98,6 +98,18 @@ module "castai_nebius_edge_location" {
   organization_id  = module.castai_gke_cluster.organization_id
   editors_group_id = var.nebius_editors_group_id
 
+  network_cidr = "10.0.0.0/13"
+  subnet_cidr  = "10.0.0.0/24"
+
+  addons = [
+    {
+      name = "nvidia-gpu-operator"
+    },
+    {
+      name = "nvidia-network-operator"
+    }
+  ]
+
   tags = {
     ManagedBy = "terraform"
   }
