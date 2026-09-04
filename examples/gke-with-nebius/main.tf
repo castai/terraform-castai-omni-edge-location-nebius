@@ -64,6 +64,31 @@ locals {
   ))
 }
 
+resource "null_resource" "castai_wait_for_cluster" {
+  count      = var.castai_wait_for_cluster ? 1 : 0
+  depends_on = [module.castai_gke_cluster]
+
+  provisioner "local-exec" {
+    environment = {
+      API_KEY = var.castai_api_token
+    }
+    command = <<-EOT
+        RETRY_COUNT=20
+        POLLING_INTERVAL=30
+
+        for i in $(seq 1 $RETRY_COUNT); do
+            sleep $POLLING_INTERVAL
+            curl -s ${var.castai_api_url}/v1/kubernetes/external-clusters/${module.castai_gke_cluster.cluster_id} -H "x-api-key: $API_KEY" | grep '"status"\s*:\s*"ready"' && exit 0
+        done
+
+        echo "Cluster is not ready after 10 minutes"
+        exit 1
+    EOT
+
+    interpreter = ["bash", "-c"]
+  }
+}
+
 # Get subnet details to retrieve the IP CIDR range
 data "google_compute_subnetwork" "gke_subnet" {
   project = var.gke_project_id
@@ -88,6 +113,11 @@ module "castai_omni_cluster" {
   reserved_subnet_cidrs = [data.google_compute_subnetwork.gke_subnet.ip_cidr_range]
 
   skip_helm = var.skip_helm
+
+  depends_on = [
+    module.castai_gke_cluster,                                                                                                                                                                                                                                                                    
+    null_resource.castai_wait_for_cluster,     
+  ]
 }
 
 module "castai_nebius_edge_location" {

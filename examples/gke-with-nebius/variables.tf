@@ -8,6 +8,12 @@ variable "castai_api_url" {
   default = "https://api.cast.ai"
 }
 
+variable "castai_wait_for_cluster" {
+  type    = bool
+  default = true
+  description = "Optional wait for CastAI cluster to be in ready state before provisioning a cluster location"
+}
+
 variable "gke_project_id" {
   type = string
 }
