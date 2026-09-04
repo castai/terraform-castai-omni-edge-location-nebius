@@ -88,6 +88,8 @@ module "castai_omni_cluster" {
   reserved_subnet_cidrs = [data.google_compute_subnetwork.gke_subnet.ip_cidr_range]
 
   skip_helm = var.skip_helm
+
+  depends_on = [module.castai_gke_cluster]
 }
 
 module "castai_nebius_edge_location" {
@@ -113,6 +115,10 @@ module "castai_nebius_edge_location" {
   tags = {
     ManagedBy = "terraform"
   }
+
+  castai_api_url = var.castai_api_url
+  castai_api_token = var.castai_api_token
+  wait_for_location_ready = true
 
   depends_on = [module.castai_omni_cluster]
 }
