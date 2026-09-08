@@ -95,6 +95,8 @@ module "castai_omni_cluster" {
 module "castai_nebius_edge_location" {
   source = "../.."
 
+  api_url          = var.castai_api_url
+  api_token        = var.castai_api_token
   parent_id        = var.nebius_project_id
   cluster_id       = module.castai_gke_cluster.cluster_id
   organization_id  = module.castai_gke_cluster.organization_id
@@ -116,8 +118,6 @@ module "castai_nebius_edge_location" {
     ManagedBy = "terraform"
   }
 
-  castai_api_url = var.castai_api_url
-  castai_api_token = var.castai_api_token
   wait_for_location_ready = true
 
   depends_on = [module.castai_omni_cluster]

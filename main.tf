@@ -334,12 +334,12 @@ resource "null_resource" "castai_wait_for_location_ready" {
 
   provisioner "local-exec" {
     environment = {
-      API_KEY = var.castai_api_token
+      API_KEY = var.api_token
     }
     command = <<-EOT
         RETRY_COUNT=20
         POLLING_INTERVAL=30
-        URL="${var.castai_api_url}/omni-provisioner/v1beta/organizations/${var.organization_id}/clusters/${var.cluster_id}/edge-locations/${castai_edge_location.this.id}"                                                                                                                                         
+        URL="${var.api_url}/omni-provisioner/v1beta/organizations/${var.organization_id}/clusters/${var.cluster_id}/edge-locations/${castai_edge_location.this.id}"
                                                                                                                                                                                                                                                                                                      
         for i in $(seq 1 $RETRY_COUNT); do                                                                                                                                                                                                                                                        
           sleep $POLLING_INTERVAL     

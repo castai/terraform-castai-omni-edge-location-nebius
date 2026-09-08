@@ -14,6 +14,19 @@ variable "name" {
   }
 }
 
+variable "api_url" {
+  type        = string
+  description = "CAST AI API URL"
+  default     = null
+}
+
+variable "api_token" {
+  type        = string
+  description = "CAST AI API token"
+  sensitive   = true
+  default     = null
+}
+
 variable "cluster_id" {
   type        = string
   description = "CAST AI cluster ID"
@@ -171,22 +184,14 @@ variable "default_edge_configuration_name" {
   }
 }
 
-variable "castai_api_url" {
-  type        = string
-  description = "URL of CAST AI API to be used while making cluster checks."
-  default = "https://api.cast.ai"
-}
-
-
-variable "castai_api_token" {
-  type        = string
-  description = "Optional CAST AI API token created in console.cast.ai API Access keys section. Used only when `wait_for_location_ready` is set to true"
-  sensitive   = true
-  default     = ""
-}
-
 variable "wait_for_location_ready" {
   type        = bool
-  description = "Optional wait for location to be ready before finishing the module execution.  This option requires `castai_api_token` to be set"
+  description = "Optional wait for location to be ready before finishing the module execution.  This option requires `api_url` and `api_token` to be set"
   default     = false
+
+  validation {
+    condition = !var.wait_for_location_ready || (var.api_url != null && var.api_token != null) 
+
+    error_message = "api_url and api_token must be set when wait_for_location_ready is true" 
+  }
 }
