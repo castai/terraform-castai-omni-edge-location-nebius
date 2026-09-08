@@ -87,6 +87,7 @@ No modules.
 | nebius_vpc_v1_security_rule.egress_all | resource |
 | nebius_vpc_v1_security_rule.ingress_self | resource |
 | nebius_vpc_v1_subnet.main | resource |
+| [null_resource.castai_wait_for_location_ready](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [null_resource.validate](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [random_id.suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/id) | resource |
 | [castai_omni_cluster.this](https://registry.terraform.io/providers/castai/castai/latest/docs/data-sources/omni_cluster) | data source |
@@ -98,6 +99,8 @@ No modules.
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_addons"></a> [addons](#input\_addons) | Optional addons to install on the edge cluster. Defaults to null (provider installs nvidia-gpu-operator by default).<br/>Set to an empty list to install no addons.<br/><br/>Each addon supports:<br/>- name (string, required): Addon identifier. One of: nvidia-gpu-operator, nvidia-dra, nvidia-network-operator, oci-csi.<br/>- values (string, optional): Helm values for the addon, encoded as a JSON object. | <pre>list(object({<br/>    name   = string<br/>    values = optional(string)<br/>  }))</pre> | `null` | no |
+| <a name="input_api_token"></a> [api\_token](#input\_api\_token) | CAST AI API token | `string` | `null` | no |
+| <a name="input_api_url"></a> [api\_url](#input\_api\_url) | CAST AI API URL | `string` | `null` | no |
 | <a name="input_cluster_id"></a> [cluster\_id](#input\_cluster\_id) | CAST AI cluster ID | `string` | n/a | yes |
 | <a name="input_control_plane"></a> [control\_plane](#input\_control\_plane) | Edge location control plane configuration.<br/>- ha (bool): enable high availability mode for the Edge location control plane (default: true) | <pre>object({<br/>    ha = optional(bool, true)<br/>  })</pre> | `{}` | no |
 | <a name="input_default_edge_configuration_name"></a> [default\_edge\_configuration\_name](#input\_default\_edge\_configuration\_name) | Name of the default edge configuration | `string` | `""` | no |
@@ -111,6 +114,7 @@ No modules.
 | <a name="input_parent_id"></a> [parent\_id](#input\_parent\_id) | Nebius project ID that will own the edge location resources (VPC network,<br/>subnet, security group, service account). Must match the parent project<br/>configured in the Nebius provider.<br/><br/>Nebius projects are created per region, so the project's region is read<br/>automatically from the project and used for the edge location. A separate<br/>`region` input is therefore not required. | `string` | n/a | yes |
 | <a name="input_subnet_cidr"></a> [subnet\_cidr](#input\_subnet\_cidr) | CIDR block for the Nebius subnet. Must be within the network CIDR (var.network\_cidr). | `string` | `"10.0.0.0/24"` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Labels to apply to Nebius resources (Nebius calls these `labels`) | `map(string)` | `{}` | no |
+| <a name="input_wait_for_location_ready"></a> [wait\_for\_location\_ready](#input\_wait\_for\_location\_ready) | Optional wait for location to be ready before finishing the module execution.  This option requires `api_url` and `api_token` to be set | `bool` | `false` | no |
 
 ## Outputs
 

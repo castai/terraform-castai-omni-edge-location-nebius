@@ -14,6 +14,19 @@ variable "name" {
   }
 }
 
+variable "api_url" {
+  type        = string
+  description = "CAST AI API URL"
+  default     = null
+}
+
+variable "api_token" {
+  type        = string
+  description = "CAST AI API token"
+  sensitive   = true
+  default     = null
+}
+
 variable "cluster_id" {
   type        = string
   description = "CAST AI cluster ID"
@@ -168,5 +181,17 @@ variable "default_edge_configuration_name" {
   validation {
     condition     = var.default_edge_configuration_name == "" || can(var.edge_configurations[var.default_edge_configuration_name])
     error_message = "The specified default_edge_configuration_name does not match any key in var.edge_configurations."
+  }
+}
+
+variable "wait_for_location_ready" {
+  type        = bool
+  description = "Optional wait for location to be ready before finishing the module execution.  This option requires `api_url` and `api_token` to be set"
+  default     = false
+
+  validation {
+    condition = !var.wait_for_location_ready || (var.api_url != null && var.api_token != null) 
+
+    error_message = "api_url and api_token must be set when wait_for_location_ready is true" 
   }
 }

@@ -327,3 +327,36 @@ resource "castai_edge_configuration_default" "this" {
   edge_location_id = castai_edge_location.this.id
   configuration_id = castai_edge_configuration.this[var.default_edge_configuration_name].id
 }
+
+resource "null_resource" "castai_wait_for_location_ready" {
+  count      = var.wait_for_location_ready ? 1 : 0
+  depends_on = [castai_edge_location.this]
+
+  provisioner "local-exec" {
+    environment = {
+      API_KEY = var.api_token
+    }
+    command = <<-EOT
+        RETRY_COUNT=20
+        POLLING_INTERVAL=30
+        URL="${var.api_url}/omni-provisioner/v1beta/organizations/${var.organization_id}/clusters/${var.cluster_id}/edge-locations/${castai_edge_location.this.id}"
+                                                                                                                                                                                                                                                                                                     
+        for i in $(seq 1 $RETRY_COUNT); do                                                                                                                                                                                                                                                        
+          sleep $POLLING_INTERVAL     
+          
+          RESPONSE=$(curl -s "$URL" -H "x-api-key: $API_KEY")                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                                  
+          if echo "$RESPONSE" | grep -iE '"state"[[:space:]]*:[[:space:]]*"ready"'; then                                                                                                                                                                                                          
+            echo "Edge location is ready"                                                                                                                                                                                                                                                         
+            exit 0                                                                                                                                                                                                                                                                                
+          fi                
+                                                                                                                                                                                                                                                                                      
+        done                                                                                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                                                                     
+        echo "Edge location is not ready after 10 minutes"
+        exit 1
+    EOT
+
+    interpreter = ["bash", "-c"]
+  }
+}
