@@ -316,6 +316,8 @@ resource "castai_edge_configuration" "this" {
     image_id           = try(each.value.image_id, null)
     boot_disk_size_gib = try(each.value.boot_disk_size_gib, null)
     labels             = try(each.value.labels, {})
+    reservation_ids    = try(each.value.reservation_ids, null)
+    gpu_cluster        = try(each.value.gpu_cluster, null)
   }
 }
 
