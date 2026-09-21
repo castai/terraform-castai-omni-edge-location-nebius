@@ -128,6 +128,8 @@ variable "edge_configurations" {
     - user_data_base64 (string, optional): Base64 encoded user data to run on the edge as part of bootstrap. The payload must start with either `#cloud-config` (cloud-init YAML) or `#!` (shell script with a shebang).
     - labels (map(string), optional): Labels to apply to edge instances created with this configuration.
     - cri (map(string), optional): Container runtime interface configuration. Defaults to `{}`.
+    - reservation_ids (list(string), optional): Capacity block reservation IDs.
+    - gpu_cluster (string, optional): GPU cluster info.
 
     Example:
     edge_configurations = {
@@ -143,6 +145,9 @@ variable "edge_configurations" {
         labels = {
           workload = "gpu"
         }
+        
+        reservation_ids = ["res-1", "res-2"]
+        gpu_cluster     = "cluster-1"
       }
     }
   EOT
@@ -153,6 +158,8 @@ variable "edge_configurations" {
     user_data_base64   = optional(string)
     cri                = optional(map(string), {})
     labels             = optional(map(string), {})
+    reservation_ids    = optional(list(string))
+    gpu_cluster        = optional(string)
   }))
   default = {}
 }
