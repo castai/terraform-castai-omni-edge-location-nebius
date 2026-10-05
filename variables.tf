@@ -104,11 +104,41 @@ variable "control_plane" {
   description = <<-EOT
     Edge location control plane configuration.
     - ha (bool): enable high availability mode for the Edge location control plane (default: true)
+    - external_address (string, optional): the IP address or hostname used to reach the API server from outside the cluster, if in-cluster LoadBalancer services are not reachable (e.g. cluster is hidden behind an external LoadBalancer).
+    - api_server_port (number, optional): the port used for the API server. Defaults to the system value when unset.
+    - konnectivity_port (number, optional): the port used for the konnectivity server. Defaults to the system value when unset.
+    - service_annotations (map(string), optional): custom annotations to apply to the control plane service.
   EOT
   type = object({
-    ha = optional(bool, true)
+    ha                  = optional(bool, true)
+    external_address    = optional(string)
+    api_server_port     = optional(number)
+    konnectivity_port   = optional(number)
+    service_annotations = optional(map(string))
   })
   default = {}
+}
+
+variable "liqo" {
+  description = <<-EOT
+    Liqo configuration for the edge cluster.
+    - gateway_replicas (number, optional): number of active replicas for the Liqo gateway servers and clients. Defaults to 1 when unset.
+    - gateway_server (object, optional): configuration overrides for the Liqo gateway server:
+      - service_labels (map(string), optional): custom labels to apply to the Liqo gateway service.
+      - service_annotations (map(string), optional): custom annotations to apply to the Liqo gateway service.
+      - external_address (string, optional): the IP address or hostname used to reach the Liqo gateway server from outside the cluster, if in-cluster LoadBalancer services are not reachable (e.g. cluster is hidden behind an external LoadBalancer).
+      - external_port (number, optional): the port used for the Liqo gateway server. Defaults to the system value when unset.
+  EOT
+  type = object({
+    gateway_replicas = optional(number)
+    gateway_server = optional(object({
+      service_labels      = optional(map(string))
+      service_annotations = optional(map(string))
+      external_address    = optional(string)
+      external_port       = optional(number)
+    }))
+  })
+  default = null
 }
 
 variable "networking" {
@@ -202,8 +232,8 @@ variable "wait_for_location_ready" {
   default     = false
 
   validation {
-    condition = !var.wait_for_location_ready || (var.api_url != null && var.api_token != null) 
+    condition = !var.wait_for_location_ready || (var.api_url != null && var.api_token != null)
 
-    error_message = "api_url and api_token must be set when wait_for_location_ready is true" 
+    error_message = "api_url and api_token must be set when wait_for_location_ready is true"
   }
 }
