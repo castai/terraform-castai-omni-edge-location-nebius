@@ -14,7 +14,7 @@ data "nebius_iam_v2_project" "this" {
 
 locals {
   # Generate name if not provided (with random suffix)
-  generated_name = var.name != null ? var.name : "nebius-${data.nebius_iam_v2_project.this.region}-${random_id.suffix.hex}"
+  generated_name = var.name != null ? var.name : "nebius-${var.region}-${random_id.suffix.hex}"
 
   # Sanitize name for Nebius resource naming (lowercase, alnum + hyphen).
   # replace() maps each character 1:1, so the sanitized length equals the input.
@@ -48,8 +48,8 @@ sanitized_name_max_length = 63 - length(local.name_prefix) - length("-ingress-se
   # Nebius regions are effectively single-zone for the v1 VPC API; expose the
   # region as a single availability zone for the castai_edge_location resource.
   zone = {
-    id   = data.nebius_iam_v2_project.this.region
-    name = data.nebius_iam_v2_project.this.region
+    id   = var.region
+    name = var.region
   }
 
   default_description = "Nebius edge location onboarded by Terraform"
@@ -90,6 +90,11 @@ resource "nebius_iam_v1_service_account" "castai" {
       # names are validated on var.name directly (see variables.tf).
       condition     = length(local.sanitized_name) <= local.sanitized_name_max_length
       error_message = "Generated resource name exceeds Nebius' 63-character limit; the auto-generated name is too long. Set var.name to a shorter value."
+    }
+
+    precondition {
+      condition     = var.region == data.nebius_iam_v2_project.this.region
+      error_message = "var.region (${var.region}) does not match the parent project's region (${data.nebius_iam_v2_project.this.region})."
     }
   }
 }
@@ -261,7 +266,7 @@ resource "nebius_vpc_v1_security_rule" "egress_all" {
 
 resource "castai_edge_location" "this" {
   name               = local.generated_name
-  region             = data.nebius_iam_v2_project.this.region
+  region             = var.region
   cluster_id         = var.cluster_id
   organization_id    = var.organization_id
   description        = var.description != null ? var.description : local.default_description

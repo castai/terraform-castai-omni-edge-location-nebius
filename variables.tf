@@ -56,6 +56,11 @@ variable "parent_id" {
   type        = string
 }
 
+variable "region" {
+  type        = string
+  description = "Region of the parent Nebius project (must match the project's actual region)."
+}
+
 variable "editors_group_id" {
   description = <<-EOT
     ID of the Nebius IAM group (e.g. the default `editors` group in the project)
