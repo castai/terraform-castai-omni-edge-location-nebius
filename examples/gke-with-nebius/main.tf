@@ -98,6 +98,7 @@ module "castai_nebius_edge_location" {
   api_url          = var.castai_api_url
   api_token        = var.castai_api_token
   parent_id        = var.nebius_project_id
+  region           = var.nebius_region
   cluster_id       = module.castai_gke_cluster.cluster_id
   organization_id  = module.castai_gke_cluster.organization_id
   editors_group_id = var.nebius_editors_group_id

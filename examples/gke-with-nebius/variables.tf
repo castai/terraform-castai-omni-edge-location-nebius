@@ -22,7 +22,12 @@ variable "gke_cluster_name" {
 
 variable "nebius_project_id" {
   type        = string
-  description = "Nebius project ID (parent_id) that will own the edge location resources. The project's region is derived automatically."
+  description = "Nebius project ID (parent_id) that will own the edge location resources."
+}
+
+variable "nebius_region" {
+  type        = string
+  description = "Region of the Nebius project (must match the project's actual region)."
 }
 
 variable "nebius_service_account_id" {
