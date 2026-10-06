@@ -4,7 +4,7 @@ terraform {
   required_providers {
     castai = {
       source  = "castai/castai"
-      version = ">= 8.64.0"
+      version = ">= 9.6.3"
     }
     nebius = {
       source  = "nebius/nebius"
