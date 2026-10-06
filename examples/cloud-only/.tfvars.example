@@ -1,0 +1,12 @@
+# Copy to .tfvars and fill in.
+
+cluster_id             = "castai-cluster-id"
+name                   = "my-edge-location"
+region                 = "eu-north1"
+
+nebius_project_id         = "project-xxxxxxxxxxxxxxxxxxxxxxxxxx"
+nebius_service_account_id = "serviceaccount-xxxxxxxxxxxxxxxxxxxxx"
+nebius_public_key_id      = "abcdef1234567890abcdef1234567890abcdef12"
+nebius_private_key_path   = "~/.nebius/authorized_key.pem"
+
+castai_oidc_subject_id = "123456789012345678901"

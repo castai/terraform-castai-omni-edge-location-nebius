@@ -1,65 +1,34 @@
 # Nebius Edge Location for CAST AI
+#
+# Full mode: this root module provisions both the Nebius cloud resources
+# (modules/cloud) and the CAST AI edge location (modules/edgelocation) in a
+# single run, requiring both Nebius and CAST AI credentials.
+#
+# When the cloud resources and the edge location are owned by different
+# parties, each party calls its submodule directly instead:
+#   - the cloud resources owner calls modules/cloud (Nebius credentials only)
+#   - the edge location owner calls modules/edgelocation (CAST AI credentials
+#     only), consuming modules/cloud's nebius_resources output
+# See the README for the handoff sequence.
 
-# Generate random suffix for edge location name
+# Generate random suffix for the edge location name
 resource "random_id" "suffix" {
   byte_length = 4
 }
 
-# Look up the Nebius project that owns the edge resources. Nebius projects are
-# created per region, so the project's region is derived here rather than
-# asked of the user separately.
-data "nebius_iam_v2_project" "this" {
-  id = var.parent_id
-}
-
-locals {
-  # Generate name if not provided (with random suffix)
-  generated_name = var.name != null ? var.name : "nebius-${var.region}-${random_id.suffix.hex}"
-
-  # Sanitize name for Nebius resource naming (lowercase, alnum + hyphen).
-  # replace() maps each character 1:1, so the sanitized length equals the input.
-  sanitized_name = lower(replace(local.generated_name, "/[^a-zA-Z0-9-]/", "-"))
-
-  # Nebius resource names are limited to 63 characters. short_resource_name is
-  # prefixed with "castai-omni-" (12 chars) and reused with suffixes, the
-  # longest being "-ingress-self" (13 chars). The sanitized core must therefore
-  # be at most 63 - 12 - 13 = 38 chars. This is validated on var.name (see
-  # variables.tf) and guarded by a precondition on the service account below
-  # for the auto-generated (region-derived) path. No silent truncation - the
-  # random suffix is always preserved in full.
-  name_prefix               = "castai-omni-"
-  sanitized_name_max_length = 63 - length(local.name_prefix) - length("-ingress-self")
-  short_resource_name       = "${local.name_prefix}${local.sanitized_name}"
-
-  # Resolve the editors group ID: use the user-provided group when set, or the
-  # module-created dedicated group when editors_group_id is null.
-  editors_group_id = coalesce(var.editors_group_id, try(nebius_iam_v1_group.castai_editors[0].id, null))
-
-  # Common labels merged once and reused across all resources.
-  # Nebius calls these `labels`; the module exposes them as `tags` for
-  # consistency with the AWS / GCP / OCI sibling modules.
-  common_labels = merge(
-    var.tags,
-    {
-      "cast-omni:cluster-id" = var.cluster_id
-    }
-  )
-
-  # Nebius regions are effectively single-zone for the v1 VPC API; expose the
-  # region as a single availability zone for the castai_edge_location resource.
-  zone = {
-    id   = var.region
-    name = var.region
-  }
-
-  default_description = "Nebius edge location onboarded by Terraform"
-}
-
 # Fetch CAST AI Omni cluster OIDC config. Used to model the impersonation
-# contract between CAST AI and the customer's Nebius service account.
+# contract between CAST AI and the Nebius service account: the WIF federated
+# subject is the CAST AI GCP service account unique ID of the Omni cluster.
 data "castai_omni_cluster" "this" {
   organization_id = var.organization_id
   cluster_id      = var.cluster_id
+}
+
+locals {
+  # Generate name if not provided (with random suffix). Computed once here and
+  # passed to both submodules so the cloud resource names and the edge location
+  # name stay consistent.
+  generated_name = var.name != null ? var.name : "nebius-${var.region}-${random_id.suffix.hex}"
 }
 
 # Validation: ensure required variables are consistent.
@@ -73,293 +42,140 @@ resource "null_resource" "validate" {
 }
 
 # =============================================================================
-# IAM: Service account, WIF federated credentials, and group membership
+# Nebius cloud resources: service account, WIF federated credentials, editors
+# group, VPC network/subnet, security group.
 # =============================================================================
 
-# Service account that CAST AI will impersonate to manage Nebius resources.
-resource "nebius_iam_v1_service_account" "castai" {
-  parent_id   = var.parent_id
-  name        = local.short_resource_name
-  description = "Service account impersonated by CAST AI for edge location ${local.generated_name}"
-  labels      = local.common_labels
+module "cloud" {
+  source = "./modules/cloud"
 
-  lifecycle {
-    precondition {
-      # Backstop for the auto-generated name (var.name == null): the region is
-      # read from the Nebius project and could exceed the budget. User-provided
-      # names are validated on var.name directly (see variables.tf).
-      condition     = length(local.sanitized_name) <= local.sanitized_name_max_length
-      error_message = "Generated resource name exceeds Nebius' 63-character limit; the auto-generated name is too long. Set var.name to a shorter value."
-    }
-
-    precondition {
-      condition     = var.region == data.nebius_iam_v2_project.this.region
-      error_message = "var.region (${var.region}) does not match the parent project's region (${data.nebius_iam_v2_project.this.region})."
-    }
-  }
-}
-
-# Workload Identity Federation (WIF): bind CAST AI's GCP OIDC identity to the
-# Nebius service account so CAST AI can impersonate it via OIDC token exchange
-# instead of static authorized-key credentials. The OIDC issuer is
-# https://accounts.google.com (CAST AI runs on GCP) and the federated subject
-# is the CAST AI GCP service account unique ID, read from the Omni cluster
-# data source.
-#
-# jwk_set_json is set explicitly because the Nebius federated credentials
-# feature is in PUBLIC PREVIEW: custom external OIDC providers with OIDC
-# discovery are only available for early adopters, but providing the JWKS
-# directly works without limitations. The JWKS is fetched from Google's
-# public cert endpoint at plan time.
-data "http" "google_jwks" {
-  url = "https://www.googleapis.com/oauth2/v3/certs"
-}
-
-resource "nebius_iam_v1_federated_credentials" "castai_wif" {
+  name       = local.generated_name
   parent_id  = var.parent_id
-  name       = "${local.short_resource_name}-wif"
-  subject_id = nebius_iam_v1_service_account.castai.id
+  region     = var.region
+  cluster_id = var.cluster_id
 
-  oidc_provider = {
-    issuer_url   = "https://accounts.google.com"
-    jwk_set_json = data.http.google_jwks.response_body
-  }
+  # WIF federated subject: the Omni cluster's CAST AI GCP identity.
+  castai_oidc_subject_id = data.castai_omni_cluster.this.castai_oidc_config.gcp_service_account_unique_id
 
-  federated_subject_id = data.castai_omni_cluster.this.castai_oidc_config.gcp_service_account_unique_id
-
-  labels = local.common_labels
+  editors_group_id = var.editors_group_id
+  network_cidr     = var.network_cidr
+  subnet_cidr      = var.subnet_cidr
+  tags             = var.tags
 }
 
 # =============================================================================
-# IAM: Editor group and group membership
+# CAST AI edge location and edge configurations.
 # =============================================================================
 
-# When editors_group_id is not provided, create a dedicated IAM group for this
-# edge location. The group is granted the editor role on the project below.
-resource "nebius_iam_v1_group" "castai_editors" {
-  count = var.editors_group_id != null ? 0 : 1
+module "edgelocation" {
+  source = "./modules/edgelocation"
 
-  parent_id = var.parent_id
-  name      = "${local.short_resource_name}-editors"
-  labels    = local.common_labels
-}
+  name            = local.generated_name
+  cluster_id      = var.cluster_id
+  organization_id = var.organization_id
+  description     = var.description
+  control_plane   = var.control_plane
+  liqo            = var.liqo
+  networking      = var.networking
+  addons          = var.addons
 
-# Grant the editor role on the project to the dedicated group. The editor role
-# allows managing compute instances, disks, and networking resources.
-resource "nebius_iam_v1_access_permit" "castai_editor" {
-  count = var.editors_group_id != null ? 0 : 1
+  edge_configurations             = var.edge_configurations
+  default_edge_configuration_name = var.default_edge_configuration_name
 
-  parent_id   = nebius_iam_v1_group.castai_editors[0].id
-  resource_id = var.parent_id
-  role        = "editor"
-}
+  wait_for_location_ready = var.wait_for_location_ready
+  api_url                 = var.api_url
+  api_token               = var.api_token
 
-# Add the service account to the editors group so it can manage compute
-# instances, disks and networking. Uses the user-provided group when set, or
-# the module-created dedicated group when editors_group_id is null.
-resource "nebius_iam_v1_group_membership" "castai" {
-  parent_id = local.editors_group_id
-  member_id = nebius_iam_v1_service_account.castai.id
-}
-
-# =============================================================================
-# VPC Network and Subnet
-# =============================================================================
-
-# Address pool carrying the user-provided network CIDR. The network references
-# this pool so its address space is defined by var.network_cidr rather than a
-# random default. The subnet uses a specific CIDR (var.subnet_cidr) carved from
-# this pool.
-resource "nebius_vpc_v1_pool" "main" {
-  parent_id  = var.parent_id
-  name       = local.short_resource_name
-  labels     = local.common_labels
-  version    = "IPV4"
-  visibility = "PRIVATE"
-
-  cidrs = [
-    {
-      cidr = var.network_cidr
-    }
-  ]
-}
-
-# VPC network that will host edge instances. References the address pool so the
-# network's address space is defined by var.network_cidr (not a random default).
-resource "nebius_vpc_v1_network" "main" {
-  parent_id = var.parent_id
-  name      = local.short_resource_name
-  labels    = local.common_labels
-
-  ipv4_private_pools = {
-    pools = [
-      { id = nebius_vpc_v1_pool.main.id }
-    ]
-  }
-}
-
-# Regional private subnet for edge instances. Uses an explicit CIDR
-# (var.subnet_cidr) that must be within the network's address space
-# (var.network_cidr). max_mask_length constrains allocations from this subnet.
-resource "nebius_vpc_v1_subnet" "main" {
-  parent_id  = var.parent_id
-  network_id = nebius_vpc_v1_network.main.id
-  name       = local.short_resource_name
-  labels     = local.common_labels
-
-  ipv4_private_pools = {
-    use_network_pools = false
-    pools = [
-      {
-        cidrs = [
-          {
-            cidr = var.subnet_cidr
-          }
-        ]
-      }
-    ]
-  }
-}
-
-# =============================================================================
-# Security Group and Rules
-# =============================================================================
-
-# Security group bound to the edge network.
-resource "nebius_vpc_v1_security_group" "main" {
-  parent_id  = var.parent_id
-  network_id = nebius_vpc_v1_network.main.id
-  name       = local.short_resource_name
-  labels     = local.common_labels
-}
-
-# Ingress: allow all traffic between instances in the same security group.
-# For a security rule, `parent_id` is the security group the rule belongs to.
-resource "nebius_vpc_v1_security_rule" "ingress_self" {
-  parent_id = nebius_vpc_v1_security_group.main.id
-  name      = "${local.short_resource_name}-ingress-self"
-  access    = "ALLOW"
-  protocol  = "ANY"
-  labels    = local.common_labels
-
-  ingress = {
-    source_security_group_id = nebius_vpc_v1_security_group.main.id
-  }
-}
-
-# Egress: allow all outbound traffic.
-resource "nebius_vpc_v1_security_rule" "egress_all" {
-  parent_id = nebius_vpc_v1_security_group.main.id
-  name      = "${local.short_resource_name}-egress-all"
-  access    = "ALLOW"
-  protocol  = "ANY"
-  labels    = local.common_labels
-
-  egress = {
-    destination_cidrs = ["0.0.0.0/0"]
-  }
-}
-
-# =============================================================================
-# CAST AI Edge Location
-# =============================================================================
-
-resource "castai_edge_location" "this" {
-  name               = local.generated_name
+  # Nebius cloud resources (handoff bundle from the cloud submodule).
+  parent_id          = var.parent_id
   region             = var.region
-  cluster_id         = var.cluster_id
-  organization_id    = var.organization_id
-  description        = var.description != null ? var.description : local.default_description
-  control_plane      = var.control_plane
-  control_plane_mode = "SHARED"
-  networking         = var.networking
-  liqo               = var.liqo
-  addons             = var.addons
-
-  zones = [local.zone]
-
-  # Nebius cloud provider configuration.
-  nebius = {
-    parent_id          = var.parent_id
-    service_account_id = nebius_iam_v1_service_account.castai.id
-    network_id         = nebius_vpc_v1_network.main.id
-    subnet_id          = nebius_vpc_v1_subnet.main.id
-    subnet_cidr        = var.subnet_cidr
-    security_group_id  = nebius_vpc_v1_security_group.main.id
-  }
-
-  depends_on = [
-    nebius_iam_v1_federated_credentials.castai_wif,
-    nebius_iam_v1_access_permit.castai_editor,
-    nebius_iam_v1_group_membership.castai,
-    nebius_vpc_v1_security_rule.ingress_self,
-    nebius_vpc_v1_security_rule.egress_all,
-  ]
+  service_account_id = module.cloud.nebius_resources.service_account_id
+  network_id         = module.cloud.nebius_resources.network_id
+  subnet_id          = module.cloud.nebius_resources.subnet_id
+  subnet_cidr        = var.subnet_cidr
+  security_group_id  = module.cloud.nebius_resources.security_group_id
 }
 
 # =============================================================================
-# CAST AI Edge Configuration (Nebius)
+# Moved blocks
 # =============================================================================
 
-resource "castai_edge_configuration" "this" {
-  for_each = var.edge_configurations
+# Preserve state compatibility for consumers of the pre-split module: the
+# resources moved into the cloud / edgelocation submodules when the split
+# ownership support was introduced. Without these, Terraform would plan a
+# destroy and recreate of every resource for existing consumers.
 
-  organization_id  = var.organization_id
-  cluster_id       = var.cluster_id
-  edge_location_id = castai_edge_location.this.id
-  name             = each.value.name
-  user_data_base64 = each.value.user_data_base64
-  cri              = each.value.cri
-
-  # NOTE: the `nebius` block on castai_edge_configuration is assumed for this
-  # draft and mirrors the structure of the existing `aws` / `gcp` / `oci` blocks.
-  nebius = {
-    image_id           = try(each.value.image_id, null)
-    boot_disk_size_gib = try(each.value.boot_disk_size_gib, null)
-    labels             = try(each.value.labels, {})
-    reservation_ids    = try(each.value.reservation_ids, null)
-    gpu_cluster        = try(each.value.gpu_cluster, null)
-  }
+moved {
+  from = nebius_iam_v1_service_account.castai
+  to   = module.cloud.nebius_iam_v1_service_account.castai
 }
 
-resource "castai_edge_configuration_default" "this" {
-  count = var.default_edge_configuration_name != "" ? 1 : 0
-
-  organization_id  = var.organization_id
-  cluster_id       = var.cluster_id
-  edge_location_id = castai_edge_location.this.id
-  configuration_id = castai_edge_configuration.this[var.default_edge_configuration_name].id
+moved {
+  from = nebius_iam_v1_federated_credentials.castai_wif
+  to   = module.cloud.nebius_iam_v1_federated_credentials.castai_wif
 }
 
-resource "null_resource" "castai_wait_for_location_ready" {
-  count      = var.wait_for_location_ready ? 1 : 0
-  depends_on = [castai_edge_location.this]
+moved {
+  from = nebius_iam_v1_group.castai_editors
+  to   = module.cloud.nebius_iam_v1_group.castai_editors
+}
 
-  provisioner "local-exec" {
-    environment = {
-      API_KEY = var.api_token
-    }
-    command = <<-EOT
-        RETRY_COUNT=20
-        POLLING_INTERVAL=30
-        URL="${var.api_url}/omni-provisioner/v1beta/organizations/${var.organization_id}/clusters/${var.cluster_id}/edge-locations/${castai_edge_location.this.id}"
-                                                                                                                                                                                                                                                                                                     
-        for i in $(seq 1 $RETRY_COUNT); do                                                                                                                                                                                                                                                        
-          sleep $POLLING_INTERVAL     
-          
-          RESPONSE=$(curl -s "$URL" -H "x-api-key: $API_KEY")                                                                                                                                                                                                                                     
-                                                                                                                                                                                                                                                                                                  
-          if echo "$RESPONSE" | grep -iE '"state"[[:space:]]*:[[:space:]]*"ready"'; then                                                                                                                                                                                                          
-            echo "Edge location is ready"                                                                                                                                                                                                                                                         
-            exit 0                                                                                                                                                                                                                                                                                
-          fi                
-                                                                                                                                                                                                                                                                                      
-        done                                                                                                                                                                                                                                                                                      
-                                                                                                                                                                                                                                                                                                     
-        echo "Edge location is not ready after 10 minutes"
-        exit 1
-    EOT
+moved {
+  from = nebius_iam_v1_access_permit.castai_editor
+  to   = module.cloud.nebius_iam_v1_access_permit.castai_editor
+}
 
-    interpreter = ["bash", "-c"]
-  }
+moved {
+  from = nebius_iam_v1_group_membership.castai
+  to   = module.cloud.nebius_iam_v1_group_membership.castai
+}
+
+moved {
+  from = nebius_vpc_v1_pool.main
+  to   = module.cloud.nebius_vpc_v1_pool.main
+}
+
+moved {
+  from = nebius_vpc_v1_network.main
+  to   = module.cloud.nebius_vpc_v1_network.main
+}
+
+moved {
+  from = nebius_vpc_v1_subnet.main
+  to   = module.cloud.nebius_vpc_v1_subnet.main
+}
+
+moved {
+  from = nebius_vpc_v1_security_group.main
+  to   = module.cloud.nebius_vpc_v1_security_group.main
+}
+
+moved {
+  from = nebius_vpc_v1_security_rule.ingress_self
+  to   = module.cloud.nebius_vpc_v1_security_rule.ingress_self
+}
+
+moved {
+  from = nebius_vpc_v1_security_rule.egress_all
+  to   = module.cloud.nebius_vpc_v1_security_rule.egress_all
+}
+
+moved {
+  from = castai_edge_location.this
+  to   = module.edgelocation.castai_edge_location.this
+}
+
+moved {
+  from = castai_edge_configuration.this
+  to   = module.edgelocation.castai_edge_configuration.this
+}
+
+moved {
+  from = castai_edge_configuration_default.this
+  to   = module.edgelocation.castai_edge_configuration_default.this
+}
+
+moved {
+  from = null_resource.castai_wait_for_location_ready
+  to   = module.edgelocation.null_resource.castai_wait_for_location_ready
 }

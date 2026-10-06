@@ -39,12 +39,99 @@ module "castai_nebius_edge_location" {
   organization_id = var.organization_id
 
   parent_id = var.nebius_project_id
+  region    = var.region
 
   tags = {
     ManagedBy = "terraform"
   }
 }
 ```
+
+## Split ownership
+
+The module is composed of two submodules, each ownable by a different party:
+
+1. **Cloud resources** (`modules/cloud`): service account, WIF federated
+   credentials, editors group, VPC network/subnet, security group. Requires
+   only Nebius credentials.
+2. **Edge location** (`modules/edgelocation`): `castai_edge_location` and
+   edge configurations. Requires only CAST AI credentials.
+
+The root module composes both for full mode (a single run, both credential
+sets). When the two parts are owned by different parties, each party calls
+its submodule directly. The owner of the edge location may also use the raw
+`castai_edge_location` resource instead of the submodule.
+
+### Handoff sequence (split ownership)
+
+```text
+1. The cluster is onboarded to CAST AI with OMNI enabled
+   (prerequisite for any edge location).
+
+2. Edge location owner -> cloud resources owner:
+   gcp_service_account_unique_id, read from the castai_omni_cluster data
+   source (castai_oidc_config). One string.
+
+3. Cloud resources owner runs modules/cloud with it as
+   castai_oidc_subject_id -> creates the Nebius service account, WIF
+   credential, VPC, security group.
+
+4. Cloud resources owner -> edge location owner: the nebius_resources output
+   (the handoff bundle: parent_id, region, service_account_id, network_id,
+   subnet_id, subnet_cidr, security_group_id).
+
+5. Edge location owner runs modules/edgelocation with the handoff bundle
+   -> creates the CAST AI edge location and edge configurations.
+```
+
+### Cloud resources only (owner of the cloud resources)
+
+```hcl
+module "castai_nebius_edge_cloud" {
+  source = "castai/omni-edge-location-nebius/castai//modules/cloud"
+
+  name      = "my-edge-location"
+  parent_id = var.nebius_project_id
+  region    = var.region
+
+  cluster_id = var.cluster_id
+
+  # WIF federated subject, provided by the edge location owner
+  # (see handoff step 2).
+  castai_oidc_subject_id = var.castai_oidc_subject_id
+}
+
+# The nebius_resources output is the handoff bundle for the owner of the
+# edge location (it includes the name, so both runs can correlate their
+# resources).
+output "nebius_resources" {
+  value = module.castai_nebius_edge_cloud.nebius_resources
+}
+```
+
+### Edge location only (owner of the edge location)
+
+```hcl
+module "castai_nebius_edge_location" {
+  source = "castai/omni-edge-location-nebius/castai//modules/edgelocation"
+
+  name            = "my-edge-location" # from the handoff bundle
+  organization_id = var.organization_id
+  cluster_id      = var.cluster_id
+
+  # Handoff bundle from the cloud-resources run (its nebius_resources output).
+  parent_id          = var.nebius_parent_id
+  region             = var.region
+  service_account_id = var.nebius_service_account_id
+  network_id         = var.nebius_network_id
+  subnet_id          = var.nebius_subnet_id
+  subnet_cidr        = var.nebius_subnet_cidr
+  security_group_id  = var.nebius_security_group_id
+}
+```
+
+See `examples/cloud-only` and `examples/edge-location-only` for complete,
+runnable versions of the split usage.
 
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
@@ -60,32 +147,18 @@ module "castai_nebius_edge_location" {
 
 ## Modules
 
-No modules.
+| Name | Source | Version |
+|------|--------|---------|
+| <a name="module_cloud"></a> [cloud](#module\_cloud) | ./modules/cloud | n/a |
+| <a name="module_edgelocation"></a> [edgelocation](#module\_edgelocation) | ./modules/edgelocation | n/a |
 
 ## Resources
 
 | Name | Type |
 |------|------|
-| [castai_edge_configuration.this](https://registry.terraform.io/providers/castai/castai/latest/docs/resources/edge_configuration) | resource |
-| [castai_edge_configuration_default.this](https://registry.terraform.io/providers/castai/castai/latest/docs/resources/edge_configuration_default) | resource |
-| [castai_edge_location.this](https://registry.terraform.io/providers/castai/castai/latest/docs/resources/edge_location) | resource |
-| nebius_iam_v1_access_permit.castai_editor | resource |
-| nebius_iam_v1_federated_credentials.castai_wif | resource |
-| nebius_iam_v1_group.castai_editors | resource |
-| nebius_iam_v1_group_membership.castai | resource |
-| nebius_iam_v1_service_account.castai | resource |
-| nebius_vpc_v1_network.main | resource |
-| nebius_vpc_v1_pool.main | resource |
-| nebius_vpc_v1_security_group.main | resource |
-| nebius_vpc_v1_security_rule.egress_all | resource |
-| nebius_vpc_v1_security_rule.ingress_self | resource |
-| nebius_vpc_v1_subnet.main | resource |
-| [null_resource.castai_wait_for_location_ready](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [null_resource.validate](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [random_id.suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/id) | resource |
 | [castai_omni_cluster.this](https://registry.terraform.io/providers/castai/castai/latest/docs/data-sources/omni_cluster) | data source |
-| [http_http.google_jwks](https://registry.terraform.io/providers/hashicorp/http/latest/docs/data-sources/http) | data source |
-| nebius_iam_v2_project.this | data source |
 
 ## Inputs
 
@@ -105,7 +178,7 @@ No modules.
 | <a name="input_network_cidr"></a> [network\_cidr](#input\_network\_cidr) | CIDR block for the Nebius network address pool. Defines the network's private IPv4 address space. | `string` | `"10.0.0.0/13"` | no |
 | <a name="input_networking"></a> [networking](#input\_networking) | Edge cluster networking configuration.<br/>- tunneled\_cidrs (list(string)): list of destination CIDR blocks whose traffic should be routed through the main cluster instead of directly from the edge cluster. | <pre>object({<br/>    tunneled_cidrs = optional(list(string))<br/>  })</pre> | `null` | no |
 | <a name="input_organization_id"></a> [organization\_id](#input\_organization\_id) | CAST AI organization ID | `string` | n/a | yes |
-| <a name="input_parent_id"></a> [parent\_id](#input\_parent\_id) | Nebius project ID that will own the edge location resources (VPC network,<br/>subnet, security group, service account). Must match the parent project<br/>configured in the Nebius provider.<br/><br/>Nebius projects are created per region, so the project's region is read<br/>automatically from the project and used for the edge location. A separate<br/>`region` input is therefore not required. | `string` | n/a | yes |
+| <a name="input_parent_id"></a> [parent\_id](#input\_parent\_id) | Nebius project ID that will own the edge location resources (VPC network,<br/>subnet, security group, service account). Must match the parent project<br/>configured in the Nebius provider.<br/><br/>Nebius projects are created per region, so var.region must match the<br/>project's region; it is validated against the project when the cloud<br/>resources are provisioned. | `string` | n/a | yes |
 | <a name="input_region"></a> [region](#input\_region) | Region of the parent Nebius project (must match the project's actual region). | `string` | n/a | yes |
 | <a name="input_subnet_cidr"></a> [subnet\_cidr](#input\_subnet\_cidr) | CIDR block for the Nebius subnet. Must be within the network CIDR (var.network\_cidr). | `string` | `"10.0.0.0/24"` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Labels to apply to Nebius resources (Nebius calls these `labels`) | `map(string)` | `{}` | no |
@@ -121,7 +194,7 @@ No modules.
 | <a name="output_edge_location_id"></a> [edge\_location\_id](#output\_edge\_location\_id) | CAST AI edge location ID |
 | <a name="output_edge_location_name"></a> [edge\_location\_name](#output\_edge\_location\_name) | CAST AI edge location name |
 | <a name="output_nebius_federated_credentials_id"></a> [nebius\_federated\_credentials\_id](#output\_nebius\_federated\_credentials\_id) | ID of the Nebius WIF federated credentials binding CAST AI's GCP OIDC identity to the service account |
-| <a name="output_nebius_resources"></a> [nebius\_resources](#output\_nebius\_resources) | Nebius resources created for the edge location |
+| <a name="output_nebius_resources"></a> [nebius\_resources](#output\_nebius\_resources) | Nebius resources created for the edge location, including everything needed to configure a castai\_edge\_location (nebius block) directly |
 <!-- END_TF_DOCS -->
 
 ## License
