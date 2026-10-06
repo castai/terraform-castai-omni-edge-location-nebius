@@ -4,10 +4,10 @@ Terraform module for creating CAST AI edge locations on Nebius AI Cloud.
 
 > Authentication uses Nebius Workload Identity Federation (WIF): the module
 > creates a Nebius service account and a `nebius_iam_v1_federated_credentials`
-> resource that binds CAST AI's GCP OIDC identity to the service account. The
-> `castai_edge_location` nebius block passes `target_service_account_id`
-> (the module-created service account), enabling CAST AI to impersonate it via
-> OIDC token exchange instead of static authorized-key credentials.
+> resource that binds CAST AI's GCP OIDC identity to the service account. CAST AI
+> impersonates the service account referenced by the nebius block's
+> `service_account_id` via OIDC token exchange, so no static authorized-key
+> credentials are ever passed to CAST AI.
 
 ## Usage
 

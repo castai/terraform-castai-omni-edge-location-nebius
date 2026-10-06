@@ -279,18 +279,13 @@ resource "castai_edge_location" "this" {
   zones = [local.zone]
 
   # Nebius cloud provider configuration.
-  # The nebius block conforms to the castai/castai provider schema at commit
-  # 78331cf (WIF). target_service_account_id enables WIF (OIDC token exchange)
-  # instead of static authorized-key credentials. Both service_account_id and
-  # target_service_account_id point to the same module-created service account.
   nebius = {
-    parent_id                 = var.parent_id
-    service_account_id        = nebius_iam_v1_service_account.castai.id
-    target_service_account_id = nebius_iam_v1_service_account.castai.id
-    network_id                = nebius_vpc_v1_network.main.id
-    subnet_id                 = nebius_vpc_v1_subnet.main.id
-    subnet_cidr               = var.subnet_cidr
-    security_group_id         = nebius_vpc_v1_security_group.main.id
+    parent_id          = var.parent_id
+    service_account_id = nebius_iam_v1_service_account.castai.id
+    network_id         = nebius_vpc_v1_network.main.id
+    subnet_id          = nebius_vpc_v1_subnet.main.id
+    subnet_cidr        = var.subnet_cidr
+    security_group_id  = nebius_vpc_v1_security_group.main.id
   }
 
   depends_on = [

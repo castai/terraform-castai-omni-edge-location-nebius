@@ -22,7 +22,12 @@ variable "organization_id" {
 
 variable "parent_id" {
   type        = string
-  description = "Nebius project ID that will own the edge location resources (VPC network, subnet, security group, service account). The project's region is read automatically and used as the edge location region."
+  description = "Nebius project ID that will own the edge location resources (VPC network, subnet, security group, service account)."
+}
+
+variable "region" {
+  type        = string
+  description = "Region of the parent Nebius project (must match the project's actual region; validated during the run)."
 }
 
 variable "nebius_service_account_id" {
