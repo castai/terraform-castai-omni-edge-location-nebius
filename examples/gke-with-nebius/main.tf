@@ -119,17 +119,17 @@ module "castai_nebius_edge_location" {
     ManagedBy = "terraform"
   }
 
-  edge_configurations = {                                                                                                                                                                                                                                                                         
-    default = {                                                                                                                                                                                                                                                                                   
-      name            = "example-1"                    
-      labels          = {
+  edge_configurations = {
+    default = {
+      name = "example-1"
+      labels = {
         key1 = "value1"
-      }          
-      boot_disk_size_gib = 0                                                                                                                                                                                                                            
-      reservation_ids = ["example-test"]
-      gpu_cluster     = "example-gpu-cluster"
-    }                                                                                                                                                                                                                                                                                             
-  }    
+      }
+      boot_disk_size_gib = 0
+      reservation_ids    = ["example-test"]
+      gpu_cluster        = "example-gpu-cluster"
+    }
+  }
 
   wait_for_location_ready = true
 

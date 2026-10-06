@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in.
+# Nebius provider credentials come from SA_ID / AUTHKEY_PUBLIC_ID /
+# AUTHKEY_PRIVATE_PATH environment variables.
+
+castai_api_token         = "castai-api-token"
+organization_id          = "castai-organization-id"
+cluster_id               = "castai-cluster-id"
+nebius_project_id        = "project-xxxxxxxxxxxxxxxxxxxxxxxxxx"
+region                   = "eu-north1"
+castai_oidc_subject_id   = "123456789012345678901"

@@ -45,13 +45,16 @@ variable "description" {
 
 variable "parent_id" {
   description = <<-EOT
-    Nebius project ID that will own the edge location resources (VPC network,
-    subnet, security group, service account). Must match the parent project
-    configured in the Nebius provider.
+    Nebius project ID that owns the edge location resources (VPC network,
+    subnet, security group, service account). When provisioning the cloud
+    resources, it must match the parent project configured in the Nebius
+    provider. It is also passed to the castai_edge_location nebius block in
+    all modes, so it is required even when provision_cloud is
+    false.
 
-    Nebius projects are created per region, so the project's region is read
-    automatically from the project and used for the edge location. A separate
-    `region` input is therefore not required.
+    Nebius projects are created per region, so var.region must match the
+    project's region; it is validated against the project when the cloud
+    resources are provisioned.
   EOT
   type        = string
 }
@@ -59,6 +62,96 @@ variable "parent_id" {
 variable "region" {
   type        = string
   description = "Region of the parent Nebius project (must match the project's actual region)."
+}
+
+variable "provision_cloud" {
+  description = <<-EOT
+    Whether to provision the Nebius cloud resources (service account, WIF
+    federated credentials, editors group, VPC network/subnet and security
+    group) in the Nebius project (var.parent_id).
+
+    Set to false to reference cloud resources provisioned separately (the
+    owner of the edge location, when cloud resources and edge location are
+    owned by different parties) via var.existing_nebius_resources and
+    var.region instead; no Nebius credentials are needed in that mode.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "provision_edgelocation" {
+  description = <<-EOT
+    Whether to provision the CAST AI edge location and its edge
+    configurations (castai_edge_location, castai_edge_configuration and the
+    default edge configuration).
+
+    Set to false to provision only the Nebius cloud resources (the owner of
+    the cloud resources, when cloud resources and edge location are owned by
+    different parties); combined with var.castai_oidc_subject_id, no CAST AI
+    data is read in that mode. Note that the castai provider is still
+    configured (Terraform configures providers for all resources in the
+    configuration, even with count = 0) and requires a valid API token, e.g.
+    via the CASTAI_API_TOKEN environment variable.
+  EOT
+  type        = bool
+  default     = true
+
+  validation {
+    condition     = var.provision_cloud || var.provision_edgelocation
+    error_message = "At least one of provision_cloud and provision_edgelocation must be true."
+  }
+}
+
+variable "castai_oidc_subject_id" {
+  description = <<-EOT
+    CAST AI GCP service account unique ID of the Omni cluster, used as the
+    federated subject of the Nebius WIF credential. It is read from the
+    castai_omni_cluster data source
+    (castai_oidc_config.gcp_service_account_unique_id) by the owner of the
+    edge location (or of the cluster) and provided to the owner of the
+    cloud resources when the two are separate.
+
+    When not set, the module reads it from the castai_omni_cluster data
+    source, which requires CAST AI API credentials. Set it explicitly to
+    avoid that data source read in cloud-only mode (the castai provider
+    still needs to be configured with a valid API token, e.g. via the
+    CASTAI_API_TOKEN environment variable).
+  EOT
+  type        = string
+  default     = null
+}
+
+variable "existing_nebius_resources" {
+  description = <<-EOT
+    Handoff bundle of existing Nebius cloud resources to reference when
+    provision_cloud is false. This is the nebius_resources output of the
+    run that provisioned the cloud resources.
+
+    Fields:
+    - service_account_id (string, required): Nebius service account impersonated by CAST AI.
+    - network_id (string, required): VPC network for edge instances.
+    - subnet_id (string, required): Subnet for edge instances.
+    - subnet_cidr (string, required): IPv4 CIDR of the subnet.
+    - security_group_id (string, required): Security group for edge instances.
+  EOT
+  type = object({
+    service_account_id = string
+    network_id         = string
+    subnet_id          = string
+    subnet_cidr        = string
+    security_group_id  = string
+  })
+  default = null
+
+  validation {
+    condition     = var.provision_cloud || var.existing_nebius_resources != null
+    error_message = "existing_nebius_resources must be set when provision_cloud is false (the handoff bundle from the run that provisioned the cloud resources)."
+  }
+
+  validation {
+    condition     = !var.provision_cloud || var.existing_nebius_resources == null
+    error_message = "existing_nebius_resources must not be set when provision_cloud is true; the module provisions the resources itself."
+  }
 }
 
 variable "editors_group_id" {

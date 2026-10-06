@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and fill in.
+
+castai_api_token = "castai-api-token"
+
+organization_id          = "castai-organization-id"
+cluster_id               = "castai-cluster-id"
+
+# Handoff bundle from the OMNI team.
+nebius_parent_id          = "project-xxxxxxxxxxxxxxxxxxxxxxxxxx"
+region                   = "eu-north1"
+nebius_service_account_id = "serviceaccount-xxxxxxxxxxxxxxxxxxxxx"
+nebius_network_id         = "network-xxxxxxxxxxxxxxxxxxxxxxxxxxx"
+nebius_subnet_id          = "subnet-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+nebius_subnet_cidr        = "10.0.0.0/24"
+nebius_security_group_id  = "securitygroup-xxxxxxxxxxxxxxxxxxxxxxx"
