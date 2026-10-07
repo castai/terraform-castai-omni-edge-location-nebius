@@ -1,37 +1,26 @@
 output "edge_location_id" {
   description = "CAST AI edge location ID"
-  value       = castai_edge_location.this.id
+  value       = module.edgelocation.edge_location_id
 }
 
 output "edge_location_name" {
   description = "CAST AI edge location name"
-  value       = castai_edge_location.this.name
+  value       = module.edgelocation.edge_location_name
 }
 
 output "nebius_resources" {
-  description = "Nebius resources created for the edge location"
-  value = {
-    parent_id                = var.parent_id
-    service_account_id       = nebius_iam_v1_service_account.castai.id
-    federated_credentials_id = nebius_iam_v1_federated_credentials.castai_wif.id
-    editors_group_id         = local.editors_group_id
-    editors_access_permit_id = try(nebius_iam_v1_access_permit.castai_editor[0].id, null)
-    network_id               = nebius_vpc_v1_network.main.id
-    subnet_id                = nebius_vpc_v1_subnet.main.id
-    security_group_id        = nebius_vpc_v1_security_group.main.id
-  }
+  description = "Nebius resources created for the edge location, including everything needed to configure a castai_edge_location (nebius block) directly"
+  value       = module.cloud.nebius_resources
 }
 
 output "nebius_federated_credentials_id" {
   description = "ID of the Nebius WIF federated credentials binding CAST AI's GCP OIDC identity to the service account"
-  value       = nebius_iam_v1_federated_credentials.castai_wif.id
+  value       = module.cloud.nebius_resources.federated_credentials_id
 }
 
 output "edge_configuration_ids" {
   description = "Map of edge configuration IDs by configuration key"
-  value = {
-    for k, v in castai_edge_configuration.this : k => v.id
-  }
+  value       = module.edgelocation.edge_configuration_ids
 }
 
 output "debug_gcp_sa_email" {

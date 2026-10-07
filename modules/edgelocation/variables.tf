@@ -1,17 +1,6 @@
 variable "name" {
   type        = string
-  description = "Name for the edge location. If not provided, will be auto-generated"
-  default     = null
-
-  validation {
-    # Nebius resource names are limited to 63 chars. The name is prefixed with
-    # "castai-omni-" (12 chars) and the longest suffix is "-ingress-self"
-    # (13 chars), so the sanitized name must be at most 38 chars. replace()
-    # maps each character 1:1, so the sanitized length equals the raw length.
-    condition = var.name == null || length(lower(replace(var.name, "/[^a-zA-Z0-9-]/", "-"))) <= 63 - 12 - 13
-
-    error_message = "name must be at most 38 characters after sanitization so that prefixed and suffixed resource names fit within Nebius' 63-character limit."
-  }
+  description = "Name for the edge location. Use the same base name as the cloud resources (the cloud submodule's nebius_resources output includes it) so the edge location correlates with its cloud resources."
 }
 
 variable "api_url" {
@@ -41,63 +30,6 @@ variable "description" {
   type        = string
   description = "Description of the edge location"
   default     = null
-}
-
-variable "parent_id" {
-  description = <<-EOT
-    Nebius project ID that will own the edge location resources (VPC network,
-    subnet, security group, service account). Must match the parent project
-    configured in the Nebius provider.
-
-    Nebius projects are created per region, so var.region must match the
-    project's region; it is validated against the project when the cloud
-    resources are provisioned.
-  EOT
-  type        = string
-}
-
-variable "region" {
-  type        = string
-  description = "Region of the parent Nebius project (must match the project's actual region)."
-}
-
-variable "editors_group_id" {
-  description = <<-EOT
-    ID of the Nebius IAM group (e.g. the default `editors` group in the project)
-    that the CAST AI service account will be added to so it can manage compute
-    and network resources. If not provided, a dedicated IAM group is created
-    automatically and granted the `editor` role on the project, so no
-    out-of-band permission setup is required.
-  EOT
-  type        = string
-  default     = null
-}
-
-variable "network_cidr" {
-  description = "CIDR block for the Nebius network address pool. Defines the network's private IPv4 address space."
-  type        = string
-  default     = "10.0.0.0/13"
-}
-
-variable "subnet_cidr" {
-  description = "CIDR block for the Nebius subnet. Must be within the network CIDR (var.network_cidr)."
-  type        = string
-  default     = "10.0.0.0/24"
-
-  validation {
-    # Check both mask specificity and address containment: the subnet mask
-    # must be >= the network mask (smaller block), and masking the subnet's
-    # network address with the network's prefix must yield the network's own
-    # address.
-    condition     = tonumber(split("/", var.subnet_cidr)[1]) >= tonumber(split("/", var.network_cidr)[1]) && cidrhost(format("%s/%s", cidrhost(var.subnet_cidr, 0), split("/", var.network_cidr)[1]), 0) == cidrhost(var.network_cidr, 0)
-    error_message = "subnet_cidr must be within the network_cidr address range."
-  }
-}
-
-variable "tags" {
-  description = "Labels to apply to Nebius resources (Nebius calls these `labels`)"
-  type        = map(string)
-  default     = {}
 }
 
 variable "control_plane" {
@@ -180,7 +112,7 @@ variable "edge_configurations" {
         labels = {
           workload = "gpu"
         }
-        
+
         reservation_ids = ["res-1", "res-2"]
         gpu_cluster     = "cluster-1"
       }
@@ -236,4 +168,45 @@ variable "wait_for_location_ready" {
 
     error_message = "api_url and api_token must be set when wait_for_location_ready is true"
   }
+}
+
+# =============================================================================
+# Nebius cloud resources to reference (handoff bundle from the cloud submodule
+# when the cloud resources and the edge location are owned by different
+# parties; provided by the root module otherwise).
+# =============================================================================
+
+variable "parent_id" {
+  description = "Nebius project ID that owns the edge location cloud resources."
+  type        = string
+}
+
+variable "region" {
+  description = "Nebius region for the edge location."
+  type        = string
+}
+
+variable "service_account_id" {
+  description = "Nebius service account impersonated by CAST AI (from the cloud resources handoff bundle)."
+  type        = string
+}
+
+variable "network_id" {
+  description = "VPC network for edge instances (from the cloud resources handoff bundle)."
+  type        = string
+}
+
+variable "subnet_id" {
+  description = "Subnet for edge instances (from the cloud resources handoff bundle)."
+  type        = string
+}
+
+variable "subnet_cidr" {
+  description = "IPv4 CIDR of the subnet (from the cloud resources handoff bundle)."
+  type        = string
+}
+
+variable "security_group_id" {
+  description = "Security group for edge instances (from the cloud resources handoff bundle)."
+  type        = string
 }
