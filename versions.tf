@@ -3,11 +3,8 @@ terraform {
 
   required_providers {
     castai = {
-      source = "castai/castai"
-      # NOTE: Nebius support in the castai provider is assumed for this draft.
-      # Bump to the version that introduces the `nebius` block on
-      # castai_edge_location / castai_edge_configuration once available.
-      version = ">= 8.64.0"
+      source  = "castai/castai"
+      version = ">= 9.6.3"
     }
     nebius = {
       source  = "registry.terraform.io/nebius/nebius"

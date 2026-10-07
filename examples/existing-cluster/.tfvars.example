@@ -1,0 +1,20 @@
+castai_api_token = "your-castai-api-token"
+castai_api_url   = "https://api.cast.ai"
+organization_id  = "your-castai-organization-id"
+cluster_id       = "your-castai-cluster-id"
+
+region                    = "your-region"
+
+parent_id                 = "your-nebius-project-id"
+nebius_service_account_id = "your-nebius-service-account-id"
+nebius_public_key_id      = "your-nebius-public-key-id"
+nebius_private_key_path   = "path/to/nebius-private-key.pem"
+
+# name                = "my-edge-location"            # optional, auto-generated if omitted
+# description         = "My Nebius edge location"     # optional
+# nebius_editors_group_id = "your-editors-group-id"   # optional, dedicated group created when omitted
+# control_plane  = { ha = true }                      # optional, HA enabled by default
+# liqo = {                                            # optional
+#   gateway_replicas = 2
+#   gateway_server   = { external_address = "gw.edge.example.com" }
+# }

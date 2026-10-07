@@ -28,7 +28,7 @@ locals {
   # for the auto-generated (region-derived) path. No silent truncation - the
   # random suffix is always preserved in full.
   name_prefix               = "castai-omni-"
-sanitized_name_max_length = 63 - length(local.name_prefix) - length("-ingress-self")
+  sanitized_name_max_length = 63 - length(local.name_prefix) - length("-ingress-self")
   short_resource_name       = "${local.name_prefix}${local.sanitized_name}"
 
   # Resolve the editors group ID: use the user-provided group when set, or the
@@ -273,23 +273,19 @@ resource "castai_edge_location" "this" {
   control_plane      = var.control_plane
   control_plane_mode = "SHARED"
   networking         = var.networking
+  liqo               = var.liqo
   addons             = var.addons
 
   zones = [local.zone]
 
   # Nebius cloud provider configuration.
-  # The nebius block conforms to the castai/castai provider schema at commit
-  # 78331cf (WIF). target_service_account_id enables WIF (OIDC token exchange)
-  # instead of static authorized-key credentials. Both service_account_id and
-  # target_service_account_id point to the same module-created service account.
   nebius = {
-    parent_id                 = var.parent_id
-    service_account_id        = nebius_iam_v1_service_account.castai.id
-    target_service_account_id = nebius_iam_v1_service_account.castai.id
-    network_id                = nebius_vpc_v1_network.main.id
-    subnet_id                 = nebius_vpc_v1_subnet.main.id
-    subnet_cidr               = var.subnet_cidr
-    security_group_id         = nebius_vpc_v1_security_group.main.id
+    parent_id          = var.parent_id
+    service_account_id = nebius_iam_v1_service_account.castai.id
+    network_id         = nebius_vpc_v1_network.main.id
+    subnet_id          = nebius_vpc_v1_subnet.main.id
+    subnet_cidr        = var.subnet_cidr
+    security_group_id  = nebius_vpc_v1_security_group.main.id
   }
 
   depends_on = [
