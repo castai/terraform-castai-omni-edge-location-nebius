@@ -50,5 +50,7 @@ module "castai_nebius_edge_location" {
 
   # Optional: wait for the location to become ready before finishing.
   # Requires api_url and api_token.
-  # wait_for_location_ready = true
+  wait_for_location_ready = true
+  api_url                 = var.castai_api_url
+  api_token               = var.castai_api_token
 }
