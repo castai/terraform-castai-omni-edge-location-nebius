@@ -1,0 +1,47 @@
+# Example input values for the edgeloc only example.
+
+# -----------------------------------------------------------------------------
+# CAST AI
+# -----------------------------------------------------------------------------
+
+castai_api_token = "<CASTAI_API_TOKEN>"
+# castai_api_url = "<CASTAI_API_URL>" # optional, defaults to https://api.cast.ai
+organization_id  = "<CASTAI_ORGANIZATION_ID>"
+cluster_id       = "<CASTAI_CLUSTER_ID>"
+
+name        = "edge_location_name>"
+# description = null # optional
+
+# -----------------------------------------------------------------------------
+# Nebius cloud-resources handoff bundle (the cloud run's nebius_resources output)
+# -----------------------------------------------------------------------------
+
+nebius_handoff = {
+  parent_id          = "<NEBIUS_PROJECT_ID>"
+  region             = "<NEBIUS_REGION>"
+  service_account_id = "<NEBIUS_SERVICE_ACCOUNT_ID>"
+  network_id         = "<NEBIUS_NETWORK_ID>"
+  subnet_id          = "<NEBIUS_SUBNET_ID>"
+  subnet_cidr        = "<NEBIUS_SUBNET_CIDR>"
+  security_group_id  = "<NEBIUS_SECURITY_GROUP_ID>"
+}
+
+# -----------------------------------------------------------------------------
+# Edge configuration
+# -----------------------------------------------------------------------------
+
+ec_b200_nebius_me_west1 = {
+  image_id        = "<NEBIUS_IMAGE_ID>"
+  reservation_ids = ["<NEBIUS_RESERVATION_ID>"]
+  gpu_cluster_id  = "<NEBIUS_GPU_CLUSTER_ID>"
+}
+
+# -----------------------------------------------------------------------------
+# External LoadBalancer overrides (control plane + Liqo gateway)
+# -----------------------------------------------------------------------------
+
+firewall_overrides = {
+  azure_firewall_ip   = "<AZURE_FIREWALL_IP>"
+  kmc_internal_lb_ip  = "<KMC_INTERNAL_LB_IP>"
+  liqo_internal_lb_ip = "<LIQO_INTERNAL_LB_IP>"
+}
