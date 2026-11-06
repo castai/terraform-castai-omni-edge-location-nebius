@@ -139,7 +139,7 @@ runnable versions of the split usage.
 | Name | Version |
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
-| <a name="requirement_castai"></a> [castai](#requirement\_castai) | >= 9.6.3 |
+| <a name="requirement_castai"></a> [castai](#requirement\_castai) | >= 9.19.0 |
 | <a name="requirement_http"></a> [http](#requirement\_http) | >= 3.0 |
 | <a name="requirement_nebius"></a> [nebius](#requirement\_nebius) | >= 0.6.8 |
 | <a name="requirement_null"></a> [null](#requirement\_null) | >= 3.0 |
