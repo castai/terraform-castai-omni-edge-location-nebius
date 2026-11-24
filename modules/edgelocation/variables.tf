@@ -77,9 +77,15 @@ variable "networking" {
   description = <<-EOT
     Edge cluster networking configuration.
     - tunneled_cidrs (list(string)): list of destination CIDR blocks whose traffic should be routed through the main cluster instead of directly from the edge cluster.
+    - pod_cidr (string): pod network range of the edge cluster. Defaults to the k0s default (10.244.0.0/16) when omitted. Immutable after creation.
+    - service_cidr (string): service network range of the edge cluster. Defaults to the k0s default (10.96.0.0/12) when omitted. Immutable after creation.
+    - external_cidr (string): external CIDR used by Liqo on the edge cluster. Defaults to 10.70.0.0/16 when omitted. Immutable after creation.
   EOT
   type = object({
     tunneled_cidrs = optional(list(string))
+    pod_cidr       = optional(string)
+    service_cidr   = optional(string)
+    external_cidr  = optional(string)
   })
   default = null
 }
